@@ -1,0 +1,50 @@
+name: Sync Upstream
+
+on:
+  schedule:
+    # Runs automatically every day at 04:00 UTC
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: sync-upstream-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  workflows: write
+
+jobs:
+  sync:
+    name: Sync with upstream (valentderah/totk-pc-recomp)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Sync upstream changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          echo "Adding upstream remote..."
+          git remote add upstream https://github.com/valentderah/totk-pc-recomp.git
+          git fetch upstream main
+
+          echo "Checking sync status..."
+          if git merge-base --is-ancestor upstream/main HEAD; then
+            echo "Branch main is already up-to-date with upstream."
+          elif git merge-base --is-ancestor HEAD upstream/main; then
+            echo "Fast-forwarding to upstream..."
+            git merge --ff-only upstream/main
+            git push origin main
+            echo "Successfully fast-forwarded to upstream main."
+          else
+            echo "Branches have diverged, merging upstream changes..."
+            git merge --no-edit upstream/main
+            git push origin main
+            echo "Successfully merged upstream main."
+          fi
